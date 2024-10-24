@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Resolution Adjuster</title>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <style>
+    /* Additional custom styling */
+    #displayed-image {
+      width: 100%;
+      max-width: 500px; /* Fixed maximum width */
+      height: auto;
+      image-rendering: pixelated; /* Show pixelation when scaled */
+      border: 1px solid #ccc; /* Optional: Add a border for better visibility */
+      margin-top: 20px;
+    }
+    #image-container {
+      text-align: center;
+    }
+    #resolution-info {
+      margin-top: 20px;
+    }
+    canvas {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+  <h1 class="my-4 text-center">Image Resolution Adjuster</h1>
+  <div class="row">
+    <div class="col-md-10">
+      <!-- File Upload -->
+    <div class="form-group">
+      <label for="image-upload">Upload an Image:</label>
+      <input type="file" class="form-control-file" id="image-upload" accept="image/jpeg, image/png">
+    </div>
+
+    <!-- Slider -->
+    <div id="slider-container" class="form-group" style="display:none;">
+      <label for="resolution-slider">Adjust Resolution (%): <span id="slider-value">100%</span></label>
+      <input type="range" class="form-control-range" id="resolution-slider" min="1" max="100" value="100">
+    </div>
+
+    <!-- Image Display -->
+    <div id="image-container">
+      <img id="displayed-image" src="#" alt="Your Image">
+    </div>
+    </div>
+    <div class="col-md-2">
+       <!-- Resolution Info -->
+    <div id="resolution-info" class="text-center">
+      <p>Width: <span id="image-width">-</span> px</p>
+      <p>Height: <span id="image-height">-</span> px</p>
+      <p>Total Pixels: <span id="total-pixels">-</span></p>
+    </div>
+
+    <!-- Download Button -->
+    <div class="text-center my-4">
+      <button id="download-button" class="btn btn-primary" style="display:none;">Download Image</button>
+    </div>
+
+    </div>
+  </div>
+    
+
+    
+
+   
+    <!-- Hidden Canvas -->
+    <canvas id="image-canvas"></canvas>
+  </div>
+
+  <script>
+    // Get DOM Elements
+const imageUpload = document.getElementById('image-upload');
+const resolutionSlider = document.getElementById('resolution-slider');
+const sliderValue = document.getElementById('slider-value');
+const displayedImage = document.getElementById('displayed-image');
+const imageWidthDisplay = document.getElementById('image-width');
+const imageHeightDisplay = document.getElementById('image-height');
+const totalPixelsDisplay = document.getElementById('total-pixels');
+const imageCanvas = document.getElementById('image-canvas');
+const sliderContainer = document.getElementById('slider-container');
+const downloadButton = document.getElementById('download-button');
+
+// Variables to store the original image
+let originalImage = new Image();
+let originalWidth = 0;
+let originalHeight = 0;
+
+// Handle Image Upload
+imageUpload.addEventListener('change', function(event) {
+  const file = event.target.files[0];
+  if (file && (file.type === 'image/jpeg' || file.type === 'image/png')) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      originalImage.onload = function() {
+        originalWidth = originalImage.width;
+        originalHeight = originalImage.height;
+        // Display the original image
+        updateImage(100); // Start with 100% resolution
+        // Show the slider and download button
+        sliderContainer.style.display = 'block';
+        downloadButton.style.display = 'inline-block';
+      };
+      originalImage.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  } else {
+    alert('Please upload a valid JPEG or PNG image.');
+  }
+});
+
+// Handle Slider Change
+resolutionSlider.addEventListener('input', function() {
+  const resolutionPercentage = parseInt(this.value);
+  sliderValue.textContent = `${resolutionPercentage}%`;
+  updateImage(resolutionPercentage);
+});
+
+// Function to Update Image Based on Resolution
+function updateImage(resolutionPercentage) {
+  // Calculate new dimensions
+  const newWidth = Math.round(originalWidth * (resolutionPercentage / 100));
+  const newHeight = Math.round(originalHeight * (resolutionPercentage / 100));
+
+  // Set canvas size
+  imageCanvas.width = newWidth;
+  imageCanvas.height = newHeight;
+
+  const ctx = imageCanvas.getContext('2d');
+  // Draw resized image on the canvas
+  ctx.drawImage(originalImage, 0, 0, newWidth, newHeight);
+
+  // Update the displayed image
+  displayedImage.src = imageCanvas.toDataURL();
+
+  // Update resolution info
+  imageWidthDisplay.textContent = newWidth;
+  imageHeightDisplay.textContent = newHeight;
+  totalPixelsDisplay.textContent = newWidth * newHeight;
+}
+
+// Handle Download Button Click
+downloadButton.addEventListener('click', function() {
+  // Convert canvas to Data URL in JPEG format
+  const dataURL = imageCanvas.toDataURL('image/jpeg', 0.92); // Quality parameter optional
+  // Create a temporary link element
+  const link = document.createElement('a');
+  link.href = dataURL;
+  link.download = 'adjusted-image.jpg';
+
+  // Append to the document
+  document.body.appendChild(link);
+
+  // Trigger click event on the link
+  link.click();
+
+  // Remove the link from the document
+  document.body.removeChild(link);
+});
+  </script>
+
+</body>
+</html>
