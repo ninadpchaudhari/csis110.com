@@ -46,6 +46,8 @@ jobs:
         with:
           source: ./
           destination: ./_site
+      - name: Change permissions of _site directory
+        run: chmod -R 755 _site  # Change permissions to allow writing
       - name: Copy dist folder to _site
         run: cp -r dist/* _site/  # Copy contents of dist/ to the _site directory
       - name: Upload artifact
