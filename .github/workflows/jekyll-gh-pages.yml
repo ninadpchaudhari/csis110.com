@@ -28,6 +28,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Set up Node.js and install Node dependencies
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'  # Adjust to your Node.js version
+
+      - name: Install Node.js dependencies
+        run: npm install  # Assumes package.json is in the root directory
+      - name: Webpack build
+        run: npm run build
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Build with Jekyll
@@ -35,6 +46,8 @@ jobs:
         with:
           source: ./
           destination: ./_site
+      - name: Copy dist folder to _site
+        run: cp -r dist/* _site/  # Copy contents of dist/ to the _site directory
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
 
