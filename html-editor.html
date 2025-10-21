@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title> Minimal HTML Playground with Console</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    
+    html,body{height:100%}
+    body{background:#0b0e14;color:#e6e6e6}
+    .bordered{border:1px solid #1f2633;border-radius:.5rem}
+    #editor{min-height:70vh}
+    #preview{min-height:70vh;background:#fff}
+    #console{min-height:14vh;background:#0e131b;color:#d4d4d4;font-family:monospace;padding:.5rem}
+    .kbd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;border:1px solid #1f2633;padding:1px 6px;border-radius:.4rem;background:#0d121a;color:#e6e6e6}
+  </style>
+  <script type="importmap">
+    {"imports":{ "monaco-editor":"https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/+esm", "emmet-monaco-es":"https://cdn.jsdelivr.net/npm/emmet-monaco-es@5.6.1/+esm" }}
+  </script>
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark px-3">
+    <span class="navbar-brand">Minimal HTML Playground</span>
+    <div class="ms-auto d-flex gap-2">
+      <span id="emmetState" class="text-light-50 small">Emmet: loading…</span>
+      <button id="run" class="btn btn-outline-light btn-sm">Run ▶</button>
+      <button id="clear" class="btn btn-outline-light btn-sm">Clear Console</button>
+      <button id="reset" class="btn btn-outline-warning btn-sm">Reset</button>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-3">
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <div class="text-secondary small mb-2" style="display: hidden;">Monaco Editor. Run with <span class="kbd">Ctrl/⌘+Enter</span>.</div>
+        
+        <div id="editor" class="bordered"></div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="text-secondary small mb-2">Preview (sandboxed)</div>
+        <iframe id="preview" class="bordered w-100" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>
+        <div class="text-secondary small mt-2">Console</div>
+        <div id="console" class="bordered"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+
+    import * as monaco from 'monaco-editor';
+    import { emmetHTML, expandAbbreviation } from 'emmet-monaco-es';
+
+    // Enable Emmet for HTML and PHP
+    let emmetLoaded = false;
+    try {
+      const disposeEmmet = emmetHTML(monaco, ['html', 'css']);
+      window.emmetMonaco = { expandAbbreviation, disposeEmmet };
+      document.getElementById('emmetState').textContent = 'Emmet: on';
+      emmetLoaded = true;
+    } catch (e) {
+      console.warn('Failed to load Emmet:', e);
+      document.getElementById('emmetState').textContent = 'Emmet: unavailable';
+    }
+
+const LS_KEY = 'monaco-emmet-min:v1';
+const starter = `<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Demo</title>
+</head>
+<body>
+<h1>Hello</h1>
+<p>See the console panel below.</p>
+<script>
+console.log('log example');
+console.warn('warn example');
+console.error('error example');
+<\/script>
+</body>
+</html>`;
+
+const editor = monaco.editor.create(document.getElementById('editor'), {
+  value: localStorage.getItem(LS_KEY) || starter,
+  language: 'html',
+  theme: 'vs-dark',
+  automaticLayout: true,
+  minimap: { enabled: false },
+  fontSize: 14
+});
+
+
+    const iframe = document.getElementById('preview');
+    const consoleDiv = document.getElementById('console');
+
+    function clearConsole(){ consoleDiv.textContent=''; }
+
+    // Compose an HTML doc that posts console messages back to parent
+    function composeDoc(html){
+      const hook = `
+<script>
+(function(){
+  function send(level, args){
+    try{ parent.postMessage({__fromSandbox:true,type:'console',level, args: Array.from(args).map(String)}, '*'); }catch(_){}
+  }
+  ['log','warn','error'].forEach(function(level){
+    const orig = console[level];
+    console[level] = function(){ send(level, arguments); try{ orig.apply(console, arguments);}catch(_){} };
+  });
+  window.onerror = function(msg, src, line, col, err){
+    send('error', [msg+' @'+(src||'')+':'+line+':'+col]);
+  };
+})();
+<\/script>`;
+      // Insert hook just before </head> or at top of <body>
+      if(/<\/head>/i.test(html)) return html.replace(/<\/head>/i, hook + '\n</head>');
+      if(/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, '$&\n'+hook+'\n');
+      return hook + html;
+    }
+
+    function run(){
+      clearConsole();
+      const html = composeDoc(editor.getValue());
+      const blob = new Blob([html], {type:'text/html'});
+      iframe.src = URL.createObjectURL(blob);
+    }
+
+    // Listen for console messages from sandboxed iframe
+    window.addEventListener('message', (ev)=>{
+      const d = ev.data||{}; if(!d.__fromSandbox || d.type!=='console') return;
+      const line = document.createElement('div');
+      if(d.level==='error') line.style.color = '#ff6b6b';
+      else if(d.level==='warn') line.style.color = '#ffb86c';
+      line.textContent = `[${d.level}] ` + (d.args||[]).join(' ');
+      consoleDiv.appendChild(line);
+      consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    });
+
+    // Controls
+    document.getElementById('run').addEventListener('click', run);
+    document.getElementById('clear').addEventListener('click', clearConsole);
+    document.getElementById('reset').addEventListener('click', ()=>{ editor.setValue(starter); run(); });
+
+    // Shortcuts & autosave
+        // Monaco editor command: Cmd/Ctrl+Enter to run()
+        editor.addCommand(
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+          () => { run(); }
+        );
+    let t; editor.onDidChangeModelContent(()=>{ clearTimeout(t); t=setTimeout(()=>localStorage.setItem(LS_KEY, editor.getValue()), 500); });
+
+    // First paint
+    run();
+  </script>
+</body>
+</html>
+<!-- ChatGPT was used to assist with code generation and editing tasks -->
